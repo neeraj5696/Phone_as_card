@@ -1,3 +1,5 @@
 <resources>
     <string name="app_name">Phone_as_card</string>
+    <string name="servicedesc">Phone as Card NFC Service</string>
+    <string name="aiddescription">MIFARE DESFire Access Card</string>
 </resources>
