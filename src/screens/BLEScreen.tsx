@@ -5,20 +5,25 @@ import {BLENative, BLEEventEmitter, SecurityNative} from '../services/NativeModu
 const BLEScreen: React.FC = () => {
   const [isAdvertising, setIsAdvertising] = useState(false);
   const [credentialData, setCredentialData] = useState('');
+  const [userId, setUserId] = useState('');
+  const [expiryDate, setExpiryDate] = useState('');
   const [connectionCount, setConnectionCount] = useState(0);
 
   useEffect(() => {
     const successListener = BLEEventEmitter.addListener('BLE_ADVERTISE_SUCCESS', () => {
-      console.log('BLE advertising started successfully');
+      console.log('✅ [EVENT] BLE advertising started successfully');
+      Alert.alert('Advertising Active', 'BLE advertising is now active');
     });
 
     const failedListener = BLEEventEmitter.addListener('BLE_ADVERTISE_FAILED', (errorCode) => {
+      console.error(`❌ [EVENT] BLE advertising failed with code: ${errorCode}`);
       Alert.alert('BLE Error', `Advertising failed with code: ${errorCode}`);
       setIsAdvertising(false);
     });
 
     const readListener = BLEEventEmitter.addListener('BLE_CREDENTIAL_READ', (deviceAddress) => {
-      console.log('Credential read by device:', deviceAddress);
+      console.log(`📄 [EVENT] Credential read by device: ${deviceAddress}`);
+      Alert.alert('Access Granted', `Device ${deviceAddress} read credentials`);
       setConnectionCount(prev => prev + 1);
     });
 
@@ -29,22 +34,47 @@ const BLEScreen: React.FC = () => {
     };
   }, []);
 
+  const startSupremaAdvertising = async () => {
+    try {
+      if (!userId.trim() || !expiryDate.trim()) {
+        console.error('❌ [UI] Missing required fields: User ID or Expiry Date');
+        Alert.alert('Error', 'Please enter User ID and Expiry Date');
+        return;
+      }
+      
+      console.log(`🟢 [UI] Starting Suprema advertising - User ID: ${userId}, Expiry: ${expiryDate}`);
+      Alert.alert('Starting', 'Initializing Suprema BLE advertising...');
+      
+      await BLENative.startSupremaAdvertising(userId, expiryDate);
+      setIsAdvertising(true);
+      
+      console.log('✅ [UI] Suprema BLE advertising started successfully');
+      Alert.alert('Success', 'Suprema BLE advertising started\nDevice is now discoverable');
+    } catch (error: any) {
+      console.error('❌ [UI] Suprema advertising error:', error.message);
+      Alert.alert('Error', error.message);
+    }
+  };
+  
   const startBLEAdvertising = async () => {
     try {
       if (!credentialData.trim()) {
+        console.error('❌ [UI] Missing credential data');
         Alert.alert('Error', 'Please enter credential data');
         return;
       }
 
-      // Encrypt credential data
+      console.log('🔐 [UI] Encrypting credential data...');
       const encrypted = await SecurityNative.encryptData(credentialData);
+      console.log('✅ [UI] Data encrypted, starting BLE advertising...');
       
-      // Start BLE advertising
       await BLENative.startAdvertising(encrypted.encryptedData);
       
       setIsAdvertising(true);
-      Alert.alert('Success', 'BLE advertising started. Device is discoverable.');
+      console.log('✅ [UI] Legacy BLE advertising started');
+      Alert.alert('Success', 'BLE advertising started\nDevice is discoverable');
     } catch (error: any) {
+      console.error('❌ [UI] BLE advertising error:', error.message);
       Alert.alert('Error', error.message);
     }
   };
@@ -64,7 +94,29 @@ const BLEScreen: React.FC = () => {
       <Text style={styles.title}>BLE Access Control</Text>
       
       <View style={styles.inputContainer}>
-        <Text style={styles.label}>Credential Data:</Text>
+        <Text style={styles.label}>User ID:</Text>
+        <TextInput
+          style={styles.input}
+          value={userId}
+          onChangeText={setUserId}
+          placeholder="Enter User ID (e.g., 12345)"
+          keyboardType="numeric"
+        />
+      </View>
+      
+      <View style={styles.inputContainer}>
+        <Text style={styles.label}>Expiry Date:</Text>
+        <TextInput
+          style={styles.input}
+          value={expiryDate}
+          onChangeText={setExpiryDate}
+          placeholder="Enter expiry date (YYYYMMDD)"
+          keyboardType="numeric"
+        />
+      </View>
+      
+      <View style={styles.inputContainer}>
+        <Text style={styles.label}>Legacy Credential Data:</Text>
         <TextInput
           style={styles.input}
           value={credentialData}
@@ -87,11 +139,19 @@ const BLEScreen: React.FC = () => {
       </View>
 
       <TouchableOpacity
+        style={[styles.button, styles.supremaButton]}
+        onPress={startSupremaAdvertising}
+        disabled={isAdvertising}
+      >
+        <Text style={styles.buttonText}>Start Suprema BLE</Text>
+      </TouchableOpacity>
+      
+      <TouchableOpacity
         style={[styles.button, isAdvertising ? styles.stopButton : styles.startButton]}
         onPress={isAdvertising ? stopBLEAdvertising : startBLEAdvertising}
       >
         <Text style={styles.buttonText}>
-          {isAdvertising ? 'Stop Advertising' : 'Start Advertising'}
+          {isAdvertising ? 'Stop Advertising' : 'Start Legacy BLE'}
         </Text>
       </TouchableOpacity>
 
@@ -177,6 +237,9 @@ const styles = StyleSheet.create({
   },
   stopButton: {
     backgroundColor: '#F44336',
+  },
+  supremaButton: {
+    backgroundColor: '#9C27B0',
   },
   buttonText: {
     color: 'white',

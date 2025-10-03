@@ -11,6 +11,7 @@ class PhoneAsCardPackage : ReactPackage {
         return listOf(
             NFCModule(reactContext),
             BLEModule(reactContext),
+            BLECentralModule(reactContext),
             SecurityModule(reactContext)
         )
     }

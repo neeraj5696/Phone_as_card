@@ -2,6 +2,7 @@ import React, {useState, useEffect} from 'react';
 import {View, Text, StyleSheet, TouchableOpacity, Alert, TextInput, PermissionsAndroid, Platform} from 'react-native';
 import {SafeAreaProvider} from 'react-native-safe-area-context';
 import {NFCNative, BLENative, SecurityNative} from './src/services/NativeModules';
+import BLEScannerScreen from './src/screens/BLEScannerScreen';
 
 function App() {
   const [currentScreen, setCurrentScreen] = useState('home');
@@ -112,13 +113,26 @@ function App() {
     return true;
   };
 
+  if (currentScreen === 'scanner') {
+    return (
+      <SafeAreaProvider>
+        <View style={styles.container}>
+          <TouchableOpacity style={styles.backButton} onPress={() => setCurrentScreen('home')}>
+            <Text style={styles.buttonText}>← Back</Text>
+          </TouchableOpacity>
+          <BLEScannerScreen />
+        </View>
+      </SafeAreaProvider>
+    );
+  }
+
   const startBLE = async () => {
     try {
       if (!cardData) {
-        Alert.alert('Error', 'Enter card data');
+        Alert.alert('Error', 'Enter CSN (Card Serial Number)');
         return;
       }
-      if (!BLENative || !SecurityNative) {
+      if (!BLENative) {
         Alert.alert('Error', 'Native modules not available');
         return;
       }
@@ -129,32 +143,44 @@ function App() {
         return;
       }
       
-      await SecurityNative.generateSecureKey();
-      const encrypted = await SecurityNative.encryptData(cardData);
+      // Validate CSN format (should be a number)
+      const csnNumber = parseInt(cardData);
+      if (isNaN(csnNumber)) {
+        Alert.alert('Error', 'CSN must be a valid number (e.g., 123456789)');
+        return;
+      }
       
-      console.log('\n🔵 === BLE TECHNOLOGY DETAILS ===');
-      console.log('📡 Technology: Bluetooth Low Energy (BLE) 4.0+');
-      console.log('🏷️  Protocol: GATT (Generic Attribute Profile)');
-      console.log('🆔 Service UUID: 12345678-1234-1234-1234-123456789abc');
-      console.log('🆔 Characteristic UUID: 87654321-4321-4321-4321-cba987654321');
-      console.log('🔒 Encryption: AES-256-GCM (Android Keystore)');
-      console.log('\n📤 DATA BEING SENT TO ACCESS CONTROL:');
-      console.log('📝 Original credential:', cardData);
-      console.log('🔐 Encrypted payload:', encrypted.encryptedData);
-      console.log('🔑 Initialization Vector:', encrypted.iv);
-      console.log('📏 Encrypted data size:', encrypted.encryptedData.length, 'characters');
-      console.log('📊 Transmission power: High (for maximum range)');
-      console.log('\n🎯 TARGET DEVICES: Suprema Mobile Access, BLE readers');
-      console.log('⚡ TRANSMISSION: 2.4 GHz, up to 10m range, hands-free');
+      console.log('\n🔵 === CSN MOBILE BLE TECHNOLOGY ===');
+      console.log('📡 Technology: CSN Mobile over Bluetooth Low Energy');
+      console.log('🏷️  Protocol: GATT with CSN and ToM services');
+      console.log('🆔 CSN Service UUID: 0000FFE0-0000-1000-8000-00805F9B34FB');
+      console.log('🆔 ToM Service UUID: 0000FFE2-0000-1000-8000-00805F9B34FB');
+      console.log('🔢 CSN Data:', cardData);
+      console.log('📊 Byte Order: MSB (Most Significant Byte first)');
+      console.log('📡 Advertising mode: BALANCED');
+      console.log('\n🎯 COMPATIBLE WITH: Biometric access control systems');
+      console.log('✅ Supports: CSN Mobile + Template on Mobile (ToM)');
+      console.log('⚡ TRANSMISSION: 2.4 GHz, up to 10m range');
+      console.log('🔍 DISCOVERY: Device name + TX power + CSN/ToM services');
       
-      await BLENative.startAdvertising(encrypted.encryptedData);
+      await BLENative.startCSNAdvertising(cardData);
       setBleActive(true);
-      Alert.alert('Success', 'BLE active');
       
-      console.log('\n✅ BLE ADVERTISING ACTIVE - Broadcasting credentials');
-      console.log('🔍 Readers can now discover and connect to read credentials');
+      // Get advertising status for debugging
+      const status = await BLENative.getAdvertisingStatus();
+      console.log('\n📊 CSN MOBILE STATUS:');
+      console.log('✅ Advertising active:', status.isAdvertising);
+      console.log('✅ GATT server open:', status.isGattServerOpen);
+      console.log('🆔 Service UUID:', status.serviceUUID);
+      
+      Alert.alert('Success', 'CSN Mobile BLE active - Ready for access control');
+      
+      console.log('\n✅ CSN MOBILE BLE ACTIVE');
+      console.log('🔍 Access control readers can now discover CSN services');
+      console.log('📱 Your phone will appear as a CSN Mobile device');
+      console.log('💡 TROUBLESHOOTING: Ensure access control supports CSN Mobile');
     } catch (e: any) {
-      Alert.alert('Error', e.message || 'BLE failed');
+      Alert.alert('Error', e.message || 'CSN Mobile BLE failed');
     }
   };
 
@@ -167,8 +193,9 @@ function App() {
           style={styles.input}
           value={cardData}
           onChangeText={setCardData}
-          placeholder="Enter card data"
-          secureTextEntry
+          placeholder="Enter CSN (Card Serial Number)"
+          keyboardType="numeric"
+          secureTextEntry={false}
         />
         
         <TouchableOpacity 
@@ -187,6 +214,13 @@ function App() {
           <Text style={styles.buttonText}>
             {bleActive ? 'Stop BLE' : 'Start BLE'}
           </Text>
+        </TouchableOpacity>
+        
+        <TouchableOpacity 
+          style={styles.scanButton} 
+          onPress={() => setCurrentScreen('scanner')}
+        >
+          <Text style={styles.buttonText}>🔍 BLE Scanner</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaProvider>
@@ -226,6 +260,19 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 16,
     fontWeight: '600',
+  },
+  scanButton: {
+    backgroundColor: '#34C759',
+    padding: 15,
+    borderRadius: 8,
+    marginBottom: 15,
+  },
+  backButton: {
+    backgroundColor: '#FF9500',
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 10,
+    alignSelf: 'flex-start',
   },
 });
 
